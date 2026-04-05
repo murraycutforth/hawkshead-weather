@@ -124,9 +124,9 @@ def compute_thermal_properties(weather_data: dict, energy_kwh: float,
     HLC = Total Energy / (Total Degree-Hours) converted to appropriate units
 
     A confidence interval is computed by propagating temp_uncertainty (°C) on
-    both the internal and external temperatures as worst-case systematic bounds:
-      - HLC lower bound: maximise ΔT (internal+δ, external-δ) → more degree-hours
-      - HLC upper bound: minimise ΔT (internal-δ, external+δ) → fewer degree-hours
+    the internal temperature only as worst-case systematic bounds:
+      - HLC lower bound: maximise ΔT (internal+δ) → more degree-hours
+      - HLC upper bound: minimise ΔT (internal-δ) → fewer degree-hours
 
     Also computes:
     - Average power usage (W)
@@ -152,11 +152,11 @@ def compute_thermal_properties(weather_data: dict, energy_kwh: float,
                 degree_days += delta
                 total_degree_hours += delta * 24  # hours in a day
 
-            delta_high = (internal_temp + temp_uncertainty) - (t_ext - temp_uncertainty)
+            delta_high = (internal_temp + temp_uncertainty) - t_ext
             if delta_high > 0:
                 total_degree_hours_high += delta_high * 24
 
-            delta_low = (internal_temp - temp_uncertainty) - (t_ext + temp_uncertainty)
+            delta_low = (internal_temp - temp_uncertainty) - t_ext
             if delta_low > 0:
                 total_degree_hours_low += delta_low * 24
 
@@ -499,7 +499,7 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
                     <input type="number" id="inp-internal-temp" placeholder="e.g. 20" step="0.1" min="0" max="35">
                 </div>
                 <div class="form-group">
-                    <label for="inp-uncertainty">Temperature uncertainty (&deg;C)</label>
+                    <label for="inp-uncertainty">Inside temperature uncertainty (&deg;C)</label>
                     <input type="number" id="inp-uncertainty" value="1.0" step="0.1" min="0" max="10">
                 </div>
             </div>
@@ -660,9 +660,9 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
         }}
 
         // Compute degree-days and degree-hours for nominal + CI bounds.
-        // Systematic worst-case bounds: uncertainty applied to both inside and outside.
-        //   High degree-hours (→ low HLC): inside+δ, outside-δ
-        //   Low  degree-hours (→ high HLC): inside-δ, outside+δ
+        // Systematic worst-case bounds: uncertainty applied to inside temperature only.
+        //   High degree-hours (→ low HLC): inside+δ
+        //   Low  degree-hours (→ high HLC): inside-δ
         let degreeDays = 0;
         let totalDegreeHours = 0;
         let totalDegreeHoursHigh = 0;
@@ -676,9 +676,9 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
                     degreeDays += delta;
                     totalDegreeHours += delta * 24;
                 }}
-                const deltaHigh = (internalTemp + uncertainty) - (tempMean[i] - uncertainty);
+                const deltaHigh = (internalTemp + uncertainty) - tempMean[i];
                 if (deltaHigh > 0) totalDegreeHoursHigh += deltaHigh * 24;
-                const deltaLow = (internalTemp - uncertainty) - (tempMean[i] + uncertainty);
+                const deltaLow = (internalTemp - uncertainty) - tempMean[i];
                 if (deltaLow > 0) totalDegreeHoursLow += deltaLow * 24;
                 validDays++;
             }}

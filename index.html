@@ -285,7 +285,7 @@
                     <input type="number" id="inp-internal-temp" placeholder="e.g. 20" step="0.1" min="0" max="35">
                 </div>
                 <div class="form-group">
-                    <label for="inp-uncertainty">Temperature uncertainty (&deg;C)</label>
+                    <label for="inp-uncertainty">Inside temperature uncertainty (&deg;C)</label>
                     <input type="number" id="inp-uncertainty" value="1.0" step="0.1" min="0" max="10">
                 </div>
             </div>
@@ -456,9 +456,9 @@
         }
 
         // Compute degree-days and degree-hours for nominal + CI bounds.
-        // Systematic worst-case bounds: uncertainty applied to both inside and outside.
-        //   High degree-hours (→ low HLC): inside+δ, outside-δ
-        //   Low  degree-hours (→ high HLC): inside-δ, outside+δ
+        // Systematic worst-case bounds: uncertainty applied to inside temperature only.
+        //   High degree-hours (→ low HLC): inside+δ
+        //   Low  degree-hours (→ high HLC): inside-δ
         let degreeDays = 0;
         let totalDegreeHours = 0;
         let totalDegreeHoursHigh = 0;
@@ -472,9 +472,9 @@
                     degreeDays += delta;
                     totalDegreeHours += delta * 24;
                 }
-                const deltaHigh = (internalTemp + uncertainty) - (tempMean[i] - uncertainty);
+                const deltaHigh = (internalTemp + uncertainty) - tempMean[i];
                 if (deltaHigh > 0) totalDegreeHoursHigh += deltaHigh * 24;
-                const deltaLow = (internalTemp - uncertainty) - (tempMean[i] + uncertainty);
+                const deltaLow = (internalTemp - uncertainty) - tempMean[i];
                 if (deltaLow > 0) totalDegreeHoursLow += deltaLow * 24;
                 validDays++;
             }
