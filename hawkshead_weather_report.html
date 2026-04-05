@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hawkshead Weather &amp; Thermal Analysis</title>
+    <title>Hawkshead Weather Report</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <style>
         :root {
-            --bg: #f4f6f8;
+            --bg: #f8f9fa;
             --card-bg: #ffffff;
             --text: #2c3e50;
             --text-muted: #6c757d;
             --accent: #3498db;
             --accent-warm: #e67e22;
+            --accent-cool: #2980b9;
             --border: #dee2e6;
+            --frost: #74b9ff;
             --max-red: #e74c3c;
             --min-blue: #2980b9;
             --mean-green: #27ae60;
-            --obs-purple: #8e44ad;
-            --frost: #74b9ff;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,9 +31,17 @@
             padding: 2rem 1rem;
         }
 
-        .container { max-width: 1040px; margin: 0 auto; }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
 
-        h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 0.25rem; }
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+            color: var(--text);
+        }
 
         .subtitle {
             color: var(--text-muted);
@@ -46,32 +54,69 @@
             border-radius: 12px;
             padding: 1.5rem;
             margin-bottom: 1.5rem;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
             border: 1px solid var(--border);
         }
 
         .card h2 {
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 0.75rem;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-value.warm { color: var(--max-red); }
+        .stat-value.cool { color: var(--min-blue); }
+        .stat-value.frost { color: var(--frost); }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 1rem 0;
+        }
+
+        .form-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
             margin-bottom: 1rem;
         }
 
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 1rem;
-            align-items: end;
+        .form-group {
+            display: flex;
+            flex-direction: column;
         }
 
-        .form-group { display: flex; flex-direction: column; }
-
         .form-group label {
-            font-size: 0.82rem;
+            font-size: 0.85rem;
             font-weight: 500;
             margin-bottom: 0.3rem;
             color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
         }
 
         .form-group input {
@@ -80,123 +125,43 @@
             border-radius: 6px;
             font-size: 0.95rem;
             color: var(--text);
-            background: #fff;
+            background: var(--bg);
         }
 
         .form-group input:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(52,152,219,0.15);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
         }
 
         .btn {
-            padding: 0.65rem 1.4rem;
+            display: inline-block;
+            padding: 0.65rem 1.5rem;
             background: var(--accent);
-            color: #fff;
+            color: white;
             border: none;
             border-radius: 6px;
             font-size: 0.95rem;
             font-weight: 500;
             cursor: pointer;
-            white-space: nowrap;
-            transition: background 0.15s;
-        }
-        .btn:hover { background: #2475a8; }
-        .btn:disabled { background: #b0bec5; cursor: not-allowed; }
-
-        #status-msg {
-            font-size: 0.84rem;
-            margin-top: 0.6rem;
-            min-height: 1.4em;
+            transition: background 0.2s;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
-            gap: 0.85rem;
+        .btn:hover { background: #2980b9; }
+        .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        .thermal-results {
+            display: none;
         }
 
-        .stat-item {
-            text-align: center;
-            padding: 0.8rem 0.5rem;
-            background: var(--bg);
-            border-radius: 8px;
-        }
-
-        .stat-value {
-            font-size: 1.55rem;
-            font-weight: 700;
-            color: var(--accent);
-            line-height: 1.2;
-        }
-        .stat-value.warm  { color: var(--max-red); }
-        .stat-value.cool  { color: var(--min-blue); }
-        .stat-value.frost { color: var(--frost); }
-
-        .stat-label {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            margin-top: 0.2rem;
-        }
-
-        .chart-wrap {
-            position: relative;
-            height: 420px;
-        }
-
-        /* Data source legend below chart */
-        .source-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1.2rem;
-            margin-top: 0.9rem;
-            font-size: 0.82rem;
-            color: var(--text-muted);
-        }
-
-        .source-legend-item {
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-        }
-
-        .source-swatch {
-            width: 24px;
-            height: 3px;
-            border-radius: 2px;
-            flex-shrink: 0;
-        }
-        .source-swatch.dashed {
-            background: repeating-linear-gradient(
-                to right,
-                currentColor 0, currentColor 5px, transparent 5px, transparent 9px
-            );
-        }
-
-        .obs-note {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            background: #f5f0fb;
-            border-left: 3px solid var(--obs-purple);
-            border-radius: 6px;
-            padding: 0.7rem 0.9rem;
-            margin-top: 1rem;
-        }
-
-        /* thermal */
-        .thermal-form {
-            display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 1rem;
-            align-items: end;
-            margin-bottom: 0.5rem;
+        .thermal-results.visible {
+            display: block;
         }
 
         .thermal-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
-            margin-top: 1rem;
         }
 
         .thermal-item {
@@ -206,19 +171,19 @@
         }
 
         .thermal-item .value {
-            font-size: 1.35rem;
+            font-size: 1.4rem;
             font-weight: 700;
             color: var(--accent-warm);
         }
 
         .thermal-item .label {
-            font-size: 0.79rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
             margin-top: 0.15rem;
         }
 
         .thermal-item .explanation {
-            font-size: 0.77rem;
+            font-size: 0.78rem;
             color: var(--text-muted);
             margin-top: 0.4rem;
             font-style: italic;
@@ -235,7 +200,7 @@
         }
 
         .data-source {
-            font-size: 0.79rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
             text-align: center;
             margin-top: 2rem;
@@ -243,525 +208,422 @@
             border-top: 1px solid var(--border);
         }
 
-        .data-source a { color: var(--accent); text-decoration: none; }
-
-        .hidden { display: none; }
-
-        @media (max-width: 680px) {
-            .form-row, .thermal-form { grid-template-columns: 1fr 1fr; }
-            .form-row .btn, .thermal-form .btn { grid-column: 1 / -1; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .chart-wrap { height: 300px; }
+        .data-source a {
+            color: var(--accent);
+            text-decoration: none;
         }
-        @media (max-width: 400px) {
-            .form-row, .thermal-form { grid-template-columns: 1fr; }
+
+        #refetch-section {
+            margin-bottom: 1rem;
+        }
+
+        #status-msg {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 600px) {
+            .form-section { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .chart-container { height: 280px; }
         }
     </style>
 </head>
 <body>
-<div class="container">
+    <div class="container">
+        <h1>Hawkshead Weather Report</h1>
+        <p class="subtitle">High Crag &mdash; temperature data and thermal analysis</p>
 
-    <h1>Hawkshead Weather Report</h1>
-    <p class="subtitle">High Crag &mdash; daily temperatures and thermal analysis</p>
-
-    <!-- ── Date picker ─────────────────────────────────────────────────── -->
-    <div class="card">
-        <h2>Date Range</h2>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="inp-start">Start date</label>
-                <input type="date" id="inp-start" value="2025-10-01">
+        <!-- Date selection form -->
+        <div class="card" id="refetch-section">
+            <h2>Select Date Range</h2>
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="inp-start">Start date</label>
+                    <input type="date" id="inp-start" value="2025-10-01">
+                </div>
+                <div class="form-group">
+                    <label for="inp-end">End date</label>
+                    <input type="date" id="inp-end" value="2026-03-31">
+                </div>
             </div>
-            <div class="form-group">
-                <label for="inp-end">End date</label>
-                <input type="date" id="inp-end" value="2026-03-31">
-            </div>
-            <button class="btn" id="btn-fetch" onclick="fetchData()">Fetch Weather Data</button>
-        </div>
-        <div id="status-msg"></div>
-    </div>
-
-    <!-- ── Stats ────────────────────────────────────────────────────────── -->
-    <div class="card hidden" id="stats-card">
-        <h2>Temperature Summary &mdash; <span id="period-label"></span></h2>
-        <div class="stats-grid" id="stats-grid"></div>
-    </div>
-
-    <!-- ── Chart ────────────────────────────────────────────────────────── -->
-    <div class="card hidden" id="chart-card">
-        <h2>Daily Temperatures</h2>
-        <div class="chart-wrap">
-            <canvas id="tempChart"></canvas>
+            <button class="btn" id="btn-fetch" onclick="refetchData()">Fetch Weather Data</button>
+            <div id="status-msg"></div>
         </div>
 
-        <!-- Legend explaining the two data sources -->
-        <div class="source-legend">
-            <div class="source-legend-item">
-                <div class="source-swatch" style="background:#e74c3c; height:2px;"></div>
-                <span>ERA5 max</span>
-            </div>
-            <div class="source-legend-item">
-                <div class="source-swatch" style="background:#27ae60; height:2px;"></div>
-                <span>ERA5 mean</span>
-            </div>
-            <div class="source-legend-item">
-                <div class="source-swatch" style="background:#2980b9; height:2px;"></div>
-                <span>ERA5 min</span>
-            </div>
-            <div class="source-legend-item">
-                <div class="source-swatch" style="background:#8e44ad; height:2px; border-top: 2px dashed #8e44ad; background:none;"></div>
-                <span>Obs-init model mean (nearest station)</span>
+        <!-- Summary stats -->
+        <div class="card" id="stats-card">
+            <h2>Temperature Summary &mdash; <span id="period-label">2025-10-01 to 2026-03-31</span></h2>
+            <div class="stats-grid" id="stats-grid">
+                <!-- Filled by JS -->
             </div>
         </div>
 
-        <div class="obs-note" id="obs-note" style="display:none;">
-            <strong>About the comparison:</strong>
-            The dashed purple line uses Open-Meteo's <em>Historical Forecast API</em>,
-            which archives NWP model runs initialised from real observations every 6 hours.
-            The nearest assimilated observations to Hawkshead are from the
-            <strong id="nearest-station-label">Met Office network</strong>.
-            This closely mirrors what an actual station would record, but is only
-            available from ~2022 onwards. ERA5 reanalysis (solid lines) goes back to 1940
-            and provides a smoothed, gridded view at ~9 km resolution.
-        </div>
-    </div>
-
-    <!-- ── Thermal analysis ─────────────────────────────────────────────── -->
-    <div class="card hidden" id="thermal-card">
-        <h2>Thermal Analysis</h2>
-        <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:1rem;">
-            Enter your heating energy usage and average internal temperature over the
-            selected period to estimate thermal properties of the house.
-        </p>
-        <div class="thermal-form">
-            <div class="form-group">
-                <label for="inp-energy">Heating energy used (kWh)</label>
-                <input type="number" id="inp-energy" placeholder="e.g. 5000" step="1" min="0">
+        <!-- Temperature chart -->
+        <div class="card">
+            <h2>Daily Temperatures</h2>
+            <div class="chart-container">
+                <canvas id="tempChart"></canvas>
             </div>
-            <div class="form-group">
-                <label for="inp-internal-temp">Average internal temperature (&deg;C)</label>
-                <input type="number" id="inp-internal-temp" placeholder="e.g. 20" step="0.1" min="0" max="35">
-            </div>
-            <button class="btn" onclick="computeThermal()">Calculate</button>
         </div>
 
-        <div class="hidden" id="thermal-results">
-            <div class="thermal-grid" id="thermal-grid"></div>
-            <div class="info-note" id="thermal-note"></div>
+        <!-- Thermal properties section -->
+        <div class="card">
+            <h2>Thermal Analysis</h2>
+            <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:1rem;">
+                Enter your heating energy usage and internal temperature to calculate
+                thermal properties of your house over the selected period.
+            </p>
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="inp-energy">Heating energy used (kWh)</label>
+                    <input type="number" id="inp-energy" placeholder="e.g. 5000" step="1" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="inp-internal-temp">Average internal temperature (&deg;C)</label>
+                    <input type="number" id="inp-internal-temp" placeholder="e.g. 20" step="0.1" min="0" max="35">
+                </div>
+                <div class="form-group">
+                    <label for="inp-uncertainty">Temperature uncertainty (&deg;C)</label>
+                    <input type="number" id="inp-uncertainty" value="1.0" step="0.1" min="0" max="10">
+                </div>
+            </div>
+            <button class="btn" onclick="computeThermal()">Calculate Thermal Properties</button>
+
+            <div class="thermal-results" id="thermal-results">
+                <div style="margin-top:1rem;">
+                    <div class="thermal-grid" id="thermal-grid">
+                        <!-- Filled by JS -->
+                    </div>
+                    <div class="info-note" id="thermal-note"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-source">
+            Data source: <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a>
+            ERA5 reanalysis &mdash;
+            Location: Hawkshead, Lake District (54.375&deg;N, 2.999&deg;W)
+            &mdash; Generated <span id="gen-time"></span>
         </div>
     </div>
 
-    <div class="data-source">
-        ERA5 reanalysis via <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a>
-        &bull;
-        Obs-initialised model via <a href="https://open-meteo.com/en/docs/historical-forecast-api" target="_blank">Open-Meteo Historical Forecast API</a>
-        &bull;
-        Hawkshead, Lake District (54.375&deg;N, 2.999&deg;W)
-    </div>
+    <script>
+    // ---- Embedded data from Python ----
+    let weatherDates = ["2025-10-01", "2025-10-02", "2025-10-03", "2025-10-04", "2025-10-05", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-10", "2025-10-11", "2025-10-12", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-18", "2025-10-19", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-25", "2025-10-26", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-01", "2025-11-02", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-08", "2025-11-09", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-15", "2025-11-16", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-22", "2025-11-23", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-27", "2025-11-28", "2025-11-29", "2025-11-30", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-06", "2025-12-07", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-13", "2025-12-14", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-20", "2025-12-21", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-25", "2025-12-26", "2025-12-27", "2025-12-28", "2025-12-29", "2025-12-30", "2025-12-31", "2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-10", "2026-01-11", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-17", "2026-01-18", "2026-01-19", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-24", "2026-01-25", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-01-31", "2026-02-01", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-07", "2026-02-08", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-14", "2026-02-15", "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-02-28", "2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-14", "2026-03-15", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-21", "2026-03-22", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-28", "2026-03-29", "2026-03-30", "2026-03-31"];
+    let tempMax = [15.3, 15.6, 16.2, 11.6, 13.6, 14.7, 13.7, 13.5, 14.1, 14.1, 14.8, 14.4, 12.9, 13.9, 12.0, 11.5, 10.7, 11.8, 12.8, 13.7, 12.6, 11.8, 10.0, 11.1, 9.0, 10.2, 10.3, 11.0, 10.0, 10.1, 12.7, 10.6, 9.9, 13.5, 13.7, 14.9, 14.7, 14.0, 12.2, 10.6, 10.9, 12.5, 12.5, 12.0, 7.7, 8.7, 7.3, 5.4, 6.2, 2.8, 3.1, 4.9, 7.0, 5.8, 7.7, 6.2, 9.4, 11.9, 9.0, 7.1, 6.1, 10.3, 7.9, 5.7, 6.3, 6.4, 8.5, 9.6, 10.3, 13.1, 9.7, 9.5, 9.0, 9.3, 9.5, 9.7, 6.0, 9.0, 9.3, 8.2, 7.0, 8.8, 9.2, 7.6, 6.2, 5.3, 5.8, 6.3, 6.0, 5.5, 5.0, 4.4, 5.3, 2.4, 1.2, 1.9, 1.0, 4.0, 4.1, 2.8, 3.8, 2.6, 8.8, 8.6, 7.1, 4.8, 5.9, 5.5, 7.2, 6.3, 7.5, 8.1, 8.2, 8.1, 7.3, 6.9, 6.1, 3.9, 5.3, 7.5, 4.1, 5.4, 7.5, 6.5, 7.8, 4.1, 5.9, 5.2, 5.1, 8.5, 7.8, 8.7, 7.0, 6.7, 5.3, 3.4, 4.6, 6.9, 6.6, 3.6, 4.7, 5.4, 9.2, 10.1, 9.5, 9.6, 10.5, 9.8, 8.8, 11.1, 6.7, 9.6, 9.2, 9.7, 13.3, 14.0, 7.3, 7.6, 9.6, 8.7, 8.8, 9.0, 9.3, 6.5, 8.5, 7.5, 8.7, 13.3, 15.5, 15.7, 13.0, 13.9, 11.0, 8.5, 9.3, 6.0, 7.8, 10.3, 7.3, 9.6, 9.6, 13.9];
+    let tempMin = [12.0, 12.1, 10.2, 8.0, 10.2, 11.9, 12.1, 8.6, 11.3, 10.3, 7.0, 6.2, 8.5, 8.5, 7.6, 8.6, 8.3, 7.7, 8.9, 9.4, 9.1, 6.4, 6.5, 6.1, 4.7, 4.0, 7.8, 8.7, 5.5, 2.3, 9.8, 6.6, 5.6, 9.4, 11.6, 11.2, 11.2, 10.9, 8.7, 8.2, 7.1, 7.0, 10.0, 7.0, 6.4, 5.9, 3.3, 1.3, 1.3, -0.3, -1.0, -1.0, 3.4, 3.4, 2.6, 0.5, 0.6, 9.0, 6.3, 2.0, 0.7, 4.9, 4.4, 3.3, 4.4, 3.6, 6.2, 6.1, 7.3, 7.9, 7.7, 7.3, 4.7, 4.0, 9.0, 3.9, 2.0, 2.6, 6.4, 5.4, 4.0, 4.7, 5.1, 4.9, 2.9, 2.8, 2.3, 1.9, 3.5, 1.9, 0.2, -1.7, 1.4, -0.6, -1.6, -2.2, -4.3, -2.4, 0.0, 0.3, 0.5, 0.1, 0.8, 6.1, 2.3, 1.8, 2.0, 0.8, 2.6, 2.0, 3.3, 6.0, 3.5, 4.7, 4.4, 5.4, 3.3, 1.9, 2.5, 1.9, 1.6, 1.2, 4.9, 3.8, 2.4, 2.0, 2.0, 3.1, 2.9, 4.6, 4.6, 4.9, 5.1, 5.6, 2.2, -0.4, -2.4, 0.7, 2.4, -0.1, 0.3, 2.5, 3.4, 6.8, 7.0, 6.6, 6.9, 6.1, 7.9, 6.4, 3.1, 4.1, 4.9, 0.6, 3.2, 5.6, 2.6, 0.6, 3.7, 6.6, 5.3, 5.4, 4.9, 1.6, 1.5, 3.0, 2.6, 8.5, 7.7, 6.1, 5.5, 4.2, 2.9, 2.3, 5.1, 2.9, 0.2, 4.3, 2.9, 4.2, 4.7, 6.2];
+    let tempMean = [13.4, 13.5, 13.5, 10.0, 11.9, 13.1, 13.0, 11.4, 12.4, 12.3, 10.5, 9.5, 11.1, 11.5, 9.3, 9.9, 9.5, 9.9, 11.2, 11.4, 10.6, 9.2, 7.7, 8.2, 7.3, 6.6, 8.9, 9.8, 8.0, 6.6, 11.0, 9.0, 7.9, 12.3, 12.7, 13.3, 12.8, 11.9, 10.8, 9.5, 9.7, 9.7, 11.0, 9.8, 7.1, 7.5, 5.3, 3.1, 3.5, 1.3, 1.0, 1.5, 5.2, 4.7, 5.2, 3.0, 3.3, 11.0, 7.8, 4.6, 3.5, 8.3, 6.1, 4.5, 5.5, 4.7, 7.5, 8.1, 8.3, 10.7, 8.8, 8.5, 7.0, 6.6, 9.2, 7.9, 3.5, 5.8, 7.5, 6.7, 5.1, 7.1, 7.8, 6.3, 4.6, 3.9, 3.7, 3.9, 4.7, 3.7, 2.3, 1.7, 3.6, 0.8, -0.5, -0.8, -2.0, 0.5, 2.4, 1.5, 2.5, 1.3, 4.0, 7.0, 5.4, 3.0, 4.0, 2.8, 4.6, 4.3, 5.4, 6.8, 5.9, 6.5, 6.0, 5.8, 5.1, 3.0, 4.0, 4.3, 3.1, 3.4, 5.9, 5.1, 5.0, 3.1, 3.6, 4.1, 3.9, 6.1, 6.2, 6.4, 6.0, 6.0, 3.8, 1.9, 1.0, 2.9, 4.1, 1.4, 2.2, 3.7, 6.0, 8.3, 8.4, 7.6, 8.7, 8.3, 8.3, 8.3, 4.9, 6.9, 8.0, 5.3, 7.7, 8.8, 4.5, 3.9, 6.5, 8.0, 7.0, 7.5, 7.2, 4.0, 4.2, 5.3, 5.7, 9.9, 10.7, 10.4, 8.5, 8.4, 6.4, 5.9, 8.4, 4.5, 4.2, 7.5, 4.7, 6.1, 7.0, 9.7];
+    let stats = {
+  "period_avg_temp": 6.587362637362638,
+  "period_max_temp": 16.2,
+  "period_min_temp": -4.3,
+  "period_avg_max": 8.751098901098901,
+  "period_avg_min": 4.556593406593406,
+  "num_frost_days": 12,
+  "num_days": 182,
+  "num_days_below_5": 62,
+  "num_days_below_0": 3
+};
+    let thermalData = null;
 
-</div><!-- /container -->
+    const LAT = 54.375;
+    const LON = -2.999;
 
-<script>
-// ============================================================
-//  Constants
-// ============================================================
-const LAT  = 54.375;
-const LON  = -2.999;
-const ARCHIVE_API  = "https://archive-api.open-meteo.com/v1/archive";
-const FORECAST_API = "https://historical-forecast-api.open-meteo.com/v1/forecast";
+    let chart = null;
 
-// ============================================================
-//  State
-// ============================================================
-let weatherDates = [];
-let tempMax  = [];
-let tempMin  = [];
-let tempMean = [];
-let obsMean  = [];   // obs-initialised model daily mean
-let chart    = null;
+    document.getElementById("gen-time").textContent = new Date().toLocaleDateString("en-GB");
 
-// ============================================================
-//  Generic HTTP GET (fetch → XHR fallback for file://)
-// ============================================================
-async function httpGet(url) {
-    try {
-        const resp = await fetch(url);
-        if (!resp.ok) {
-            const body = await resp.text();
-            throw new Error(`HTTP ${resp.status}: ${body.slice(0, 300)}`);
-        }
-        return await resp.json();
-    } catch (fetchErr) {
-        // Fall back to XHR — needed when page is served from file://
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open("GET", url, true);
-            xhr.timeout = 30000;
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try { resolve(JSON.parse(xhr.responseText)); }
-                    catch (e) { reject(new Error("Invalid JSON in response")); }
-                } else {
-                    reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`));
-                }
-            };
-            xhr.onerror = () => {
-                if (window.location.protocol === "file:") {
-                    reject(new Error(
-                        "Blocked by browser (file:// protocol). " +
-                        "Run: python3 -m http.server 8000 — then open " +
-                        "http://localhost:8000/hawkshead_weather_report.html"
-                    ));
-                } else {
-                    reject(new Error("Network error — check your connection."));
-                }
-            };
-            xhr.ontimeout = () => reject(new Error("Request timed out (30 s)."));
-            xhr.send();
-        });
-    }
-}
-
-// ============================================================
-//  Fetch both data sources in parallel
-// ============================================================
-async function fetchData() {
-    const startDate = document.getElementById("inp-start").value;
-    const endDate   = document.getElementById("inp-end").value;
-    if (!startDate || !endDate)         { alert("Select both dates."); return; }
-    if (endDate <= startDate)           { alert("End date must be after start date."); return; }
-
-    const btn = document.getElementById("btn-fetch");
-    const msg = document.getElementById("status-msg");
-    btn.disabled = true;
-    setMsg(msg, "Fetching ERA5 reanalysis and obs-initialised model data…", "var(--text-muted)");
-
-    // ERA5 reanalysis URL
-    const era5Url = `${ARCHIVE_API}?latitude=${LAT}&longitude=${LON}` +
-        `&start_date=${startDate}&end_date=${endDate}` +
-        `&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean` +
-        `&timezone=Europe%2FLondon`;
-
-    // Historical Forecast API — obs-initialised model runs, best_match
-    // Available from ~2022; older dates return an error which we handle gracefully.
-    const obsUrl = `${FORECAST_API}?latitude=${LAT}&longitude=${LON}` +
-        `&start_date=${startDate}&end_date=${endDate}` +
-        `&daily=temperature_2m_mean` +
-        `&timezone=Europe%2FLondon` +
-        `&models=best_match`;
-
-    try {
-        // Run both requests in parallel; obs fetch is allowed to fail silently
-        const [era5Data, obsData] = await Promise.allSettled([
-            httpGet(era5Url),
-            httpGet(obsUrl),
-        ]);
-
-        // --- ERA5 (required) ---
-        if (era5Data.status === "rejected") {
-            throw new Error("ERA5 fetch failed: " + era5Data.reason.message);
-        }
-        const era5 = era5Data.value;
-        if (!era5.daily || !era5.daily.time) {
-            throw new Error("No daily data in ERA5 response.");
-        }
-        weatherDates = era5.daily.time;
-        tempMax      = era5.daily.temperature_2m_max;
-        tempMin      = era5.daily.temperature_2m_min;
-        tempMean     = era5.daily.temperature_2m_mean;
-
-        // --- Obs-initialised model (optional) ---
-        obsMean = [];
-        let obsAvailable = false;
-        if (obsData.status === "fulfilled") {
-            const obs = obsData.value;
-            if (obs.daily && obs.daily.temperature_2m_mean) {
-                // Align obs dates to ERA5 dates (obs may cover a shorter range)
-                const obsDateMap = new Map();
-                obs.daily.time.forEach((d, i) => obsDateMap.set(d, obs.daily.temperature_2m_mean[i]));
-                obsMean = weatherDates.map(d => obsDateMap.has(d) ? obsDateMap.get(d) : null);
-                obsAvailable = obsMean.some(v => v !== null);
-            }
-        }
-
-        // Render
-        const stats = computeStats();
-        document.getElementById("period-label").textContent = `${startDate} to ${endDate}`;
-        renderStats(stats);
-        renderChart(obsAvailable);
-
-        ["stats-card", "chart-card", "thermal-card"].forEach(
-            id => document.getElementById(id).classList.remove("hidden")
-        );
-        document.getElementById("thermal-results").classList.add("hidden");
-
-        const obsNote = document.getElementById("obs-note");
-        if (obsAvailable) {
-            obsNote.style.display = "";
-        } else {
-            obsNote.style.display = "none";
-        }
-
-        const obsCount = obsMean.filter(v => v !== null).length;
-        setMsg(msg,
-            `Loaded ${weatherDates.length} days of ERA5 data.` +
-            (obsAvailable
-                ? ` Obs-initialised model: ${obsCount} days available.`
-                : " Obs-initialised model not available for this date range (requires 2022+)."),
-            obsAvailable ? "#27ae60" : "var(--text-muted)"
-        );
-
-    } catch (err) {
-        console.error(err);
-        setMsg(msg, `Error: ${err.message}`, "#e74c3c");
-    } finally {
-        btn.disabled = false;
-    }
-}
-
-function setMsg(el, text, color) {
-    el.textContent = text;
-    el.style.color = color;
-}
-
-// ============================================================
-//  Stats
-// ============================================================
-function computeStats() {
-    const means = tempMean.filter(t => t !== null);
-    const maxes = tempMax.filter(t => t !== null);
-    const mins  = tempMin.filter(t => t !== null);
-    return {
-        avg:    means.reduce((a, b) => a + b, 0) / means.length,
-        max:    Math.max(...maxes),
-        min:    Math.min(...mins),
-        avgMax: maxes.reduce((a, b) => a + b, 0) / maxes.length,
-        avgMin: mins.reduce((a, b) => a + b, 0) / mins.length,
-        days:   means.length,
-        frost:  mins.filter(t => t < 0).length,
-        below5: means.filter(t => t < 5).length,
-    };
-}
-
-function renderStats(s) {
-    document.getElementById("stats-grid").innerHTML = `
-        <div class="stat-item">
-            <div class="stat-value">${s.avg.toFixed(1)}&deg;C</div>
-            <div class="stat-label">Period average</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value warm">${s.max.toFixed(1)}&deg;C</div>
-            <div class="stat-label">Highest recorded</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value cool">${s.min.toFixed(1)}&deg;C</div>
-            <div class="stat-label">Lowest recorded</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">${s.avgMax.toFixed(1)} / ${s.avgMin.toFixed(1)}&deg;C</div>
-            <div class="stat-label">Avg daily max / min</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value frost">${s.frost}</div>
-            <div class="stat-label">Frost days (min &lt; 0&deg;C)</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">${s.below5}</div>
-            <div class="stat-label">Days mean &lt; 5&deg;C</div>
-        </div>
-    `;
-}
-
-// ============================================================
-//  Chart
-// ============================================================
-function renderChart(obsAvailable) {
-    const ctx = document.getElementById("tempChart").getContext("2d");
-    if (chart) chart.destroy();
-
-    const datasets = [
-        {
-            label: "ERA5 Max",
-            data: tempMax,
-            borderColor: "#e74c3c",
-            backgroundColor: "rgba(231,76,60,0.06)",
-            fill: "+2",
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            order: 3,
-        },
-        {
-            label: "ERA5 Mean",
-            data: tempMean,
-            borderColor: "#27ae60",
-            backgroundColor: "transparent",
-            fill: false,
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.3,
-            order: 2,
-        },
-        {
-            label: "ERA5 Min",
-            data: tempMin,
-            borderColor: "#2980b9",
-            backgroundColor: "rgba(41,128,185,0.06)",
-            fill: false,
-            borderWidth: 1.5,
-            pointRadius: 0,
-            tension: 0.3,
-            order: 3,
-        },
-    ];
-
-    if (obsAvailable) {
-        datasets.push({
-            label: "Obs-init Mean",
-            data: obsMean,
-            borderColor: "#8e44ad",
-            backgroundColor: "transparent",
-            fill: false,
-            borderWidth: 2,
-            borderDash: [6, 4],
-            pointRadius: 0,
-            tension: 0.3,
-            order: 1,
-            spanGaps: true,
-        });
+    // ---- Stats display ----
+    function renderStats(s) {
+        const grid = document.getElementById("stats-grid");
+        grid.innerHTML = `
+            <div class="stat-item">
+                <div class="stat-value">${s.period_avg_temp.toFixed(1)}&deg;C</div>
+                <div class="stat-label">Average temperature</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value warm">${s.period_max_temp.toFixed(1)}&deg;C</div>
+                <div class="stat-label">Highest recorded</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value cool">${s.period_min_temp.toFixed(1)}&deg;C</div>
+                <div class="stat-label">Lowest recorded</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${s.num_days}</div>
+                <div class="stat-label">Days of data</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value frost">${s.num_frost_days}</div>
+                <div class="stat-label">Frost days (min &lt; 0&deg;C)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${s.num_days_below_5}</div>
+                <div class="stat-label">Days mean &lt; 5&deg;C</div>
+            </div>
+        `;
     }
 
-    chart = new Chart(ctx, {
-        type: "line",
-        data: { labels: weatherDates, datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: "index", intersect: false },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: c => `${c.dataset.label}: ${c.parsed.y != null ? c.parsed.y.toFixed(1) : "—"}\u00b0C`
+    // ---- Chart rendering ----
+    function renderChart(dates, tMax, tMin, tMean) {
+        const ctx = document.getElementById("tempChart").getContext("2d");
+
+        if (chart) chart.destroy();
+
+        chart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: dates,
+                datasets: [
+                    {
+                        label: "Max",
+                        data: tMax,
+                        borderColor: "#e74c3c",
+                        backgroundColor: "rgba(231,76,60,0.08)",
+                        fill: "+1",
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        tension: 0.3,
+                    },
+                    {
+                        label: "Mean",
+                        data: tMean,
+                        borderColor: "#27ae60",
+                        backgroundColor: "rgba(39,174,96,0.08)",
+                        fill: false,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.3,
+                    },
+                    {
+                        label: "Min",
+                        data: tMin,
+                        borderColor: "#2980b9",
+                        backgroundColor: "rgba(41,128,185,0.08)",
+                        fill: "-1",
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        tension: 0.3,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: "index",
+                    intersect: false,
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1) ?? '—'}°C`
+                        }
+                    },
+                    legend: {
+                        labels: { usePointStyle: true, padding: 16 }
                     }
                 },
-                legend: {
-                    labels: { usePointStyle: true, padding: 16 }
-                },
-            },
-            scales: {
-                x: {
-                    type: "category",
-                    ticks: { maxTicksLimit: 12, maxRotation: 45 },
-                    grid: { display: false },
-                },
-                y: {
-                    title: { display: true, text: "Temperature (\u00b0C)" },
-                    grid: { color: "rgba(0,0,0,0.05)" },
+                scales: {
+                    x: {
+                        type: "category",
+                        ticks: {
+                            maxTicksLimit: 12,
+                            maxRotation: 45,
+                        },
+                        grid: { display: false },
+                    },
+                    y: {
+                        title: { display: true, text: "Temperature (°C)" },
+                        grid: { color: "rgba(0,0,0,0.05)" },
+                    }
                 }
             }
+        });
+    }
+
+    // ---- Thermal computation (client-side) ----
+    function computeThermal() {
+        const energyKwh = parseFloat(document.getElementById("inp-energy").value);
+        const internalTemp = parseFloat(document.getElementById("inp-internal-temp").value);
+        const uncertainty = parseFloat(document.getElementById("inp-uncertainty").value) || 1.0;
+
+        if (isNaN(energyKwh) || isNaN(internalTemp) || energyKwh <= 0) {
+            alert("Please enter valid energy usage (kWh) and internal temperature.");
+            return;
         }
-    });
-}
 
-// ============================================================
-//  Thermal calculation (uses ERA5 mean for degree-days)
-// ============================================================
-function computeThermal() {
-    const energyKwh   = parseFloat(document.getElementById("inp-energy").value);
-    const internalTemp = parseFloat(document.getElementById("inp-internal-temp").value);
+        // Compute degree-days and degree-hours for nominal + CI bounds.
+        // Systematic worst-case bounds: uncertainty applied to both inside and outside.
+        //   High degree-hours (→ low HLC): inside+δ, outside-δ
+        //   Low  degree-hours (→ high HLC): inside-δ, outside+δ
+        let degreeDays = 0;
+        let totalDegreeHours = 0;
+        let totalDegreeHoursHigh = 0;
+        let totalDegreeHoursLow = 0;
+        let validDays = 0;
 
-    if (isNaN(energyKwh) || isNaN(internalTemp) || energyKwh <= 0) {
-        alert("Enter a valid energy usage (kWh > 0) and internal temperature.");
-        return;
+        for (let i = 0; i < tempMean.length; i++) {
+            if (tempMean[i] !== null) {
+                const delta = internalTemp - tempMean[i];
+                if (delta > 0) {
+                    degreeDays += delta;
+                    totalDegreeHours += delta * 24;
+                }
+                const deltaHigh = (internalTemp + uncertainty) - (tempMean[i] - uncertainty);
+                if (deltaHigh > 0) totalDegreeHoursHigh += deltaHigh * 24;
+                const deltaLow = (internalTemp - uncertainty) - (tempMean[i] + uncertainty);
+                if (deltaLow > 0) totalDegreeHoursLow += deltaLow * 24;
+                validDays++;
+            }
+        }
+
+        if (validDays === 0 || totalDegreeHours === 0) {
+            alert("No valid heating data for this period.");
+            return;
+        }
+
+        const energyWh = energyKwh * 1000;
+        const periodHours = validDays * 24;
+        const avgPower = energyWh / periodHours;
+        const hlc = energyWh / totalDegreeHours;
+        const hlcLow = totalDegreeHoursHigh > 0 ? energyWh / totalDegreeHoursHigh : 0;
+        const hlcHigh = totalDegreeHoursLow > 0 ? energyWh / totalDegreeHoursLow : null;
+        const avgDeltaT = degreeDays / validDays;
+        const energyPerDD = energyKwh / degreeDays;
+        const savingsPerDegree = hlc * 24 / 1000;
+
+        const hlcCIStr = hlcHigh !== null
+            ? `${hlcLow.toFixed(0)}&ndash;${hlcHigh.toFixed(0)} W/K`
+            : `&ge;${hlcLow.toFixed(0)} W/K`;
+
+        const grid = document.getElementById("thermal-grid");
+        grid.innerHTML = `
+            <div class="thermal-item">
+                <div class="value">${hlc.toFixed(0)} W/K</div>
+                <div class="label">Heat Loss Coefficient (HLC)</div>
+                <div class="explanation">Total rate of heat loss per degree of
+                inside-outside temperature difference. Includes fabric, ventilation,
+                and all other losses.</div>
+                <div class="explanation" style="margin-top:0.5rem;">
+                    <strong>±${uncertainty}&deg;C uncertainty &rarr; ${hlcCIStr}</strong>
+                </div>
+            </div>
+            <div class="thermal-item">
+                <div class="value">${avgPower.toFixed(0)} W</div>
+                <div class="label">Average heating power</div>
+                <div class="explanation">Mean rate of energy consumption over the
+                entire period.</div>
+            </div>
+            <div class="thermal-item">
+                <div class="value">${degreeDays.toFixed(0)}</div>
+                <div class="label">Heating degree-days</div>
+                <div class="explanation">Cumulative daily temperature deficit below
+                your internal setpoint of ${internalTemp}&deg;C. Higher = colder period.</div>
+            </div>
+            <div class="thermal-item">
+                <div class="value">${avgDeltaT.toFixed(1)} &deg;C</div>
+                <div class="label">Average &Delta;T</div>
+                <div class="explanation">Mean difference between internal and external
+                temperature over the period.</div>
+            </div>
+            <div class="thermal-item">
+                <div class="value">${energyPerDD.toFixed(2)} kWh/DD</div>
+                <div class="label">Energy per degree-day</div>
+                <div class="explanation">How much energy is used per unit of heating
+                demand. Lower is better.</div>
+            </div>
+            <div class="thermal-item">
+                <div class="value">${savingsPerDegree.toFixed(1)} kWh/day</div>
+                <div class="label">Savings per 1&deg;C reduction</div>
+                <div class="explanation">Estimated daily energy saving if you lower
+                the thermostat by 1&deg;C.</div>
+            </div>
+        `;
+
+        document.getElementById("thermal-note").innerHTML =
+            `<strong>Interpretation:</strong> Your house has a Heat Loss Coefficient of
+            approximately <strong>${hlc.toFixed(0)} W/K</strong> (${hlcCIStr} accounting for
+            &plusmn;${uncertainty}&deg;C uncertainty on both temperature readings). This means for every
+            1&deg;C difference between inside and outside, the house loses ${hlc.toFixed(0)}
+            watts of heat continuously. Over ${validDays} days with an average temperature
+            deficit of ${avgDeltaT.toFixed(1)}&deg;C, this required ${energyKwh.toLocaleString()}
+            kWh of heating energy. A typical well-insulated UK home has an HLC of 100&ndash;200 W/K;
+            an older or larger property may be 200&ndash;400+ W/K.`;
+
+        document.getElementById("thermal-results").classList.add("visible");
     }
 
-    let degreeDays = 0, totalDegHours = 0, validDays = 0;
-    for (const t of tempMean) {
-        if (t !== null) {
-            const delta = internalTemp - t;
-            if (delta > 0) { degreeDays += delta; totalDegHours += delta * 24; }
-            validDays++;
+    // ---- Re-fetch data from Open-Meteo ----
+    async function refetchData() {
+        const startDate = document.getElementById("inp-start").value;
+        const endDate = document.getElementById("inp-end").value;
+
+        if (!startDate || !endDate) {
+            alert("Please select both start and end dates.");
+            return;
+        }
+
+        const btn = document.getElementById("btn-fetch");
+        const statusMsg = document.getElementById("status-msg");
+        btn.disabled = true;
+        statusMsg.textContent = "Fetching data from Open-Meteo...";
+
+        const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${LAT}&longitude=${LON}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean&timezone=Europe/London`;
+
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+
+            if (!data.daily) throw new Error("No daily data in response");
+
+            weatherDates = data.daily.time;
+            tempMax = data.daily.temperature_2m_max;
+            tempMin = data.daily.temperature_2m_min;
+            tempMean = data.daily.temperature_2m_mean;
+
+            // Recompute stats
+            const means = tempMean.filter(t => t !== null);
+            const maxes = tempMax.filter(t => t !== null);
+            const mins = tempMin.filter(t => t !== null);
+
+            stats = {
+                period_avg_temp: means.reduce((a,b) => a+b, 0) / means.length,
+                period_max_temp: Math.max(...maxes),
+                period_min_temp: Math.min(...mins),
+                num_days: means.length,
+                num_frost_days: mins.filter(t => t < 0).length,
+                num_days_below_5: means.filter(t => t < 5).length,
+            };
+
+            document.getElementById("period-label").textContent = `${startDate} to ${endDate}`;
+            renderStats(stats);
+            renderChart(weatherDates, tempMax, tempMin, tempMean);
+
+            // Hide thermal results (dates changed, needs recalc)
+            document.getElementById("thermal-results").classList.remove("visible");
+
+            statusMsg.textContent = `Loaded ${weatherDates.length} days of data.`;
+        } catch (err) {
+            statusMsg.textContent = `Error: ${err.message}. The Historical API may not have data for very recent dates (up to 5 days lag).`;
+        } finally {
+            btn.disabled = false;
         }
     }
 
-    if (!validDays || !totalDegHours) {
-        alert("No heating demand detected — outside was always above your setpoint.");
-        return;
+    // ---- Pre-fill thermal inputs if data was provided via Python ----
+    if (thermalData) {
+        document.getElementById("inp-energy").value = thermalData.energy_kwh;
+        document.getElementById("inp-internal-temp").value = thermalData.internal_temp;
+        document.getElementById("inp-uncertainty").value = thermalData.temp_uncertainty ?? 1.0;
     }
 
-    const energyWh  = energyKwh * 1000;
-    const hlc       = energyWh / totalDegHours;
-    const avgPower  = energyWh / (validDays * 24);
-    const avgDeltaT = degreeDays / validDays;
-    const ePerDD    = energyKwh / degreeDays;
-    const saving1C  = hlc * 24 / 1000;
-
-    document.getElementById("thermal-grid").innerHTML = `
-        <div class="thermal-item">
-            <div class="value">${hlc.toFixed(0)} W/K</div>
-            <div class="label">Heat Loss Coefficient (HLC)</div>
-            <div class="explanation">Total rate of heat loss per °C inside–outside difference.
-            Includes fabric, ventilation, infiltration, and bridging.</div>
-        </div>
-        <div class="thermal-item">
-            <div class="value">${avgPower.toFixed(0)} W</div>
-            <div class="label">Average heating power</div>
-            <div class="explanation">Mean rate of energy input over the full ${validDays}-day period.</div>
-        </div>
-        <div class="thermal-item">
-            <div class="value">${degreeDays.toFixed(0)} °C·days</div>
-            <div class="label">Heating degree-days</div>
-            <div class="explanation">Cumulative daily temperature deficit below the
-            ${internalTemp}°C setpoint.</div>
-        </div>
-        <div class="thermal-item">
-            <div class="value">${avgDeltaT.toFixed(1)} °C</div>
-            <div class="label">Average ΔT</div>
-            <div class="explanation">Mean inside–outside temperature difference during
-            the heating period.</div>
-        </div>
-        <div class="thermal-item">
-            <div class="value">${ePerDD.toFixed(2)} kWh/DD</div>
-            <div class="label">Energy intensity</div>
-            <div class="explanation">Energy per degree-day. Lower = better insulated or
-            more efficient heating.</div>
-        </div>
-        <div class="thermal-item">
-            <div class="value">${saving1C.toFixed(1)} kWh/day</div>
-            <div class="label">Saving per 1°C reduction</div>
-            <div class="explanation">Estimated daily saving from lowering the thermostat
-            by 1°C.</div>
-        </div>
-    `;
-
-    document.getElementById("thermal-note").innerHTML =
-        `<strong>Interpretation:</strong> Your house has an estimated HLC of
-        <strong>${hlc.toFixed(0)} W/K</strong> — for every 1°C difference between
-        inside and outside, ${hlc.toFixed(0)} W flows out continuously. Over
-        ${validDays} days with ${energyKwh.toLocaleString()} kWh consumed and an
-        average ΔT of ${avgDeltaT.toFixed(1)}°C, this gives an energy intensity of
-        ${ePerDD.toFixed(2)} kWh/degree-day.
-        <br><br>
-        <strong>UK benchmarks:</strong> well-insulated modern home ≈ 100–200 W/K;
-        older or larger detached house ≈ 200–400+ W/K. Note: these figures treat all
-        energy input as heating — no adjustment for solar gains or internal heat
-        sources — so the true HLC will be somewhat lower.`;
-
-    document.getElementById("thermal-results").classList.remove("hidden");
-}
-
-// ============================================================
-//  file:// hint on load
-// ============================================================
-if (window.location.protocol === "file:") {
-    const msg = document.getElementById("status-msg");
-    msg.innerHTML =
-        "<strong>Tip:</strong> Opening from a local file may block API requests. " +
-        "If fetching fails, run <code>python3 -m http.server 8000</code> in this folder " +
-        "and open <a href='http://localhost:8000/hawkshead_weather_report.html'>" +
-        "http://localhost:8000/hawkshead_weather_report.html</a>.";
-    msg.style.color = "#e67e22";
-}
-</script>
+    // ---- Initial render ----
+    renderStats(stats);
+    renderChart(weatherDates, tempMax, tempMin, tempMean);
+    </script>
 </body>
 </html>

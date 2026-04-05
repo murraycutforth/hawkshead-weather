@@ -112,7 +112,8 @@ def compute_statistics(weather_data: dict) -> dict:
 
 
 def compute_thermal_properties(weather_data: dict, energy_kwh: float,
-                                internal_temp: float) -> dict:
+                                internal_temp: float,
+                                temp_uncertainty: float = 1.0) -> dict:
     """
     Compute thermal properties of the house.
 
@@ -121,6 +122,11 @@ def compute_thermal_properties(weather_data: dict, energy_kwh: float,
     difference between inside and outside.
 
     HLC = Total Energy / (Total Degree-Hours) converted to appropriate units
+
+    A confidence interval is computed by propagating temp_uncertainty (°C) on
+    both the internal and external temperatures as worst-case systematic bounds:
+      - HLC lower bound: maximise ΔT (internal+δ, external-δ) → more degree-hours
+      - HLC upper bound: minimise ΔT (internal-δ, external+δ) → fewer degree-hours
 
     Also computes:
     - Average power usage (W)
@@ -137,6 +143,8 @@ def compute_thermal_properties(weather_data: dict, energy_kwh: float,
     # A degree-day is one day where outside temp is 1°C below the internal temp
     degree_days = 0.0
     total_degree_hours = 0.0
+    total_degree_hours_high = 0.0  # internal+δ, external-δ → lower HLC bound
+    total_degree_hours_low = 0.0   # internal-δ, external+δ → upper HLC bound
     for t_ext in means:
         if t_ext is not None:
             delta = internal_temp - t_ext
@@ -144,9 +152,16 @@ def compute_thermal_properties(weather_data: dict, energy_kwh: float,
                 degree_days += delta
                 total_degree_hours += delta * 24  # hours in a day
 
-    # Total energy in Joules and Wh
+            delta_high = (internal_temp + temp_uncertainty) - (t_ext - temp_uncertainty)
+            if delta_high > 0:
+                total_degree_hours_high += delta_high * 24
+
+            delta_low = (internal_temp - temp_uncertainty) - (t_ext + temp_uncertainty)
+            if delta_low > 0:
+                total_degree_hours_low += delta_low * 24
+
+    # Total energy in Wh
     energy_wh = energy_kwh * 1000
-    energy_joules = energy_wh * 3600
 
     # Period duration
     period_hours = num_days * 24
@@ -155,8 +170,9 @@ def compute_thermal_properties(weather_data: dict, energy_kwh: float,
     avg_power_w = energy_wh / period_hours if period_hours > 0 else 0
 
     # Heat Loss Coefficient (W/K) = Total Energy (Wh) / Total Degree-Hours (°C·h)
-    # This is the steady-state heat loss rate per degree of temperature difference
     hlc = energy_wh / total_degree_hours if total_degree_hours > 0 else 0
+    hlc_low = energy_wh / total_degree_hours_high if total_degree_hours_high > 0 else 0
+    hlc_high = energy_wh / total_degree_hours_low if total_degree_hours_low > 0 else None
 
     # Average temperature difference
     avg_temp_diff = degree_days / num_days if num_days > 0 else 0
@@ -167,11 +183,14 @@ def compute_thermal_properties(weather_data: dict, energy_kwh: float,
     return {
         "energy_kwh": energy_kwh,
         "internal_temp": internal_temp,
+        "temp_uncertainty": temp_uncertainty,
         "num_days": num_days,
         "degree_days": round(degree_days, 1),
         "total_degree_hours": round(total_degree_hours, 1),
         "avg_power_w": round(avg_power_w, 1),
         "heat_loss_coefficient_w_per_k": round(hlc, 2),
+        "heat_loss_coefficient_w_per_k_low": round(hlc_low, 2),
+        "heat_loss_coefficient_w_per_k_high": round(hlc_high, 2) if hlc_high is not None else None,
         "avg_temp_difference": round(avg_temp_diff, 1),
         "energy_per_degree_day_kwh": round(energy_per_dd, 3),
         "estimated_annual_hlc_cost_note": (
@@ -297,7 +316,7 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
 
         .form-section {{
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 1rem;
             margin-bottom: 1rem;
         }}
@@ -479,6 +498,10 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
                     <label for="inp-internal-temp">Average internal temperature (&deg;C)</label>
                     <input type="number" id="inp-internal-temp" placeholder="e.g. 20" step="0.1" min="0" max="35">
                 </div>
+                <div class="form-group">
+                    <label for="inp-uncertainty">Temperature uncertainty (&deg;C)</label>
+                    <input type="number" id="inp-uncertainty" value="1.0" step="0.1" min="0" max="10">
+                </div>
             </div>
             <button class="btn" onclick="computeThermal()">Calculate Thermal Properties</button>
 
@@ -629,15 +652,21 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
     function computeThermal() {{
         const energyKwh = parseFloat(document.getElementById("inp-energy").value);
         const internalTemp = parseFloat(document.getElementById("inp-internal-temp").value);
+        const uncertainty = parseFloat(document.getElementById("inp-uncertainty").value) || 1.0;
 
         if (isNaN(energyKwh) || isNaN(internalTemp) || energyKwh <= 0) {{
             alert("Please enter valid energy usage (kWh) and internal temperature.");
             return;
         }}
 
-        // Compute degree-days and degree-hours
+        // Compute degree-days and degree-hours for nominal + CI bounds.
+        // Systematic worst-case bounds: uncertainty applied to both inside and outside.
+        //   High degree-hours (→ low HLC): inside+δ, outside-δ
+        //   Low  degree-hours (→ high HLC): inside-δ, outside+δ
         let degreeDays = 0;
         let totalDegreeHours = 0;
+        let totalDegreeHoursHigh = 0;
+        let totalDegreeHoursLow = 0;
         let validDays = 0;
 
         for (let i = 0; i < tempMean.length; i++) {{
@@ -647,6 +676,10 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
                     degreeDays += delta;
                     totalDegreeHours += delta * 24;
                 }}
+                const deltaHigh = (internalTemp + uncertainty) - (tempMean[i] - uncertainty);
+                if (deltaHigh > 0) totalDegreeHoursHigh += deltaHigh * 24;
+                const deltaLow = (internalTemp - uncertainty) - (tempMean[i] + uncertainty);
+                if (deltaLow > 0) totalDegreeHoursLow += deltaLow * 24;
                 validDays++;
             }}
         }}
@@ -659,10 +692,16 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
         const energyWh = energyKwh * 1000;
         const periodHours = validDays * 24;
         const avgPower = energyWh / periodHours;
-        const hlc = energyWh / totalDegreeHours;  // W/K
+        const hlc = energyWh / totalDegreeHours;
+        const hlcLow = totalDegreeHoursHigh > 0 ? energyWh / totalDegreeHoursHigh : 0;
+        const hlcHigh = totalDegreeHoursLow > 0 ? energyWh / totalDegreeHoursLow : null;
         const avgDeltaT = degreeDays / validDays;
         const energyPerDD = energyKwh / degreeDays;
-        const savingsPerDegree = hlc * 24 / 1000;  // kWh/day per 1°C reduction
+        const savingsPerDegree = hlc * 24 / 1000;
+
+        const hlcCIStr = hlcHigh !== null
+            ? `${{hlcLow.toFixed(0)}}&ndash;${{hlcHigh.toFixed(0)}} W/K`
+            : `&ge;${{hlcLow.toFixed(0)}} W/K`;
 
         const grid = document.getElementById("thermal-grid");
         grid.innerHTML = `
@@ -672,6 +711,9 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
                 <div class="explanation">Total rate of heat loss per degree of
                 inside-outside temperature difference. Includes fabric, ventilation,
                 and all other losses.</div>
+                <div class="explanation" style="margin-top:0.5rem;">
+                    <strong>±${{uncertainty}}&deg;C uncertainty &rarr; ${{hlcCIStr}}</strong>
+                </div>
             </div>
             <div class="thermal-item">
                 <div class="value">${{avgPower.toFixed(0)}} W</div>
@@ -707,7 +749,8 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
 
         document.getElementById("thermal-note").innerHTML =
             `<strong>Interpretation:</strong> Your house has a Heat Loss Coefficient of
-            approximately <strong>${{hlc.toFixed(0)}} W/K</strong>. This means for every
+            approximately <strong>${{hlc.toFixed(0)}} W/K</strong> (${{hlcCIStr}} accounting for
+            &plusmn;${{uncertainty}}&deg;C uncertainty on both temperature readings). This means for every
             1&deg;C difference between inside and outside, the house loses ${{hlc.toFixed(0)}}
             watts of heat continuously. Over ${{validDays}} days with an average temperature
             deficit of ${{avgDeltaT.toFixed(1)}}&deg;C, this required ${{energyKwh.toLocaleString()}}
@@ -779,6 +822,7 @@ def generate_html(weather_data: dict, stats: dict, thermal: dict | None,
     if (thermalData) {{
         document.getElementById("inp-energy").value = thermalData.energy_kwh;
         document.getElementById("inp-internal-temp").value = thermalData.internal_temp;
+        document.getElementById("inp-uncertainty").value = thermalData.temp_uncertainty ?? 1.0;
     }}
 
     // ---- Initial render ----
@@ -801,6 +845,9 @@ def main():
                         help="Heating energy usage in kWh (optional)")
     parser.add_argument("--internal-temp", type=float, default=None,
                         help="Average internal temperature in °C (optional)")
+    parser.add_argument("--temp-uncertainty", type=float, default=1.0,
+                        help="Temperature measurement uncertainty in °C applied to both "
+                             "inside and outside readings (default: 1.0)")
     parser.add_argument("--output", default=None,
                         help="Output HTML file path (default: hawkshead_weather_report.html)")
     parser.add_argument("--serve", action="store_true",
@@ -838,10 +885,16 @@ def main():
     thermal = None
     if args.energy is not None and args.internal_temp is not None:
         thermal = compute_thermal_properties(
-            weather_data, args.energy, args.internal_temp
+            weather_data, args.energy, args.internal_temp,
+            temp_uncertainty=args.temp_uncertainty
         )
+        hlc = thermal['heat_loss_coefficient_w_per_k']
+        hlc_low = thermal['heat_loss_coefficient_w_per_k_low']
+        hlc_high = thermal['heat_loss_coefficient_w_per_k_high']
+        ci_str = f"  (±{args.temp_uncertainty}°C uncertainty → {hlc_low:.0f}–{hlc_high:.0f} W/K)"
         print(f"\n--- Thermal Properties ---")
-        print(f"  Heat Loss Coefficient: {thermal['heat_loss_coefficient_w_per_k']:.0f} W/K")
+        print(f"  Heat Loss Coefficient: {hlc:.0f} W/K")
+        print(ci_str)
         print(f"  Average power: {thermal['avg_power_w']:.0f} W")
         print(f"  Degree-days: {thermal['degree_days']:.0f}")
         print(f"  Energy per degree-day: {thermal['energy_per_degree_day_kwh']:.3f} kWh/DD")
